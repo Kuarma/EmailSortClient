@@ -1,26 +1,30 @@
-﻿using EmailSortClient.Interfaces;
+﻿using EmailSortClient.ValidationOperations;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 
 namespace EmailSortClient;
 
-public class Worker : IHostedService
+public class Worker : BackgroundService
 {
-    private readonly IConsoleRequests _consoleRequests;
-    private readonly IEmailSortClientRequests _emailSortClientRequests;
+    private readonly UserData _userData;
+    private readonly ILogger<Worker> _logger;
+    private readonly IEmailServerHttpClient _emailSortClientRequests;
     
-    public Worker(IConsoleRequests consoleRequests, IEmailSortClientRequests emailSortClientRequests)
+    public Worker(UserData userData, ILogger<Worker> logger, IEmailServerHttpClient emailServerHttpClient)
     {
-        _consoleRequests = consoleRequests;
-        _emailSortClientRequests = emailSortClientRequests;
-    }
-    
-    public async Task StartAsync(CancellationToken cancellationToken)
-    {
-        var test = await _emailSortClientRequests.LoginToEmailSortAsync(_consoleRequests.LoginToApi());
+        _userData = userData;
+        _logger = logger;
+        _emailSortClientRequests = emailServerHttpClient;
     }
 
-    public Task StopAsync(CancellationToken cancellationToken)
+    protected async override Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        throw new NotImplementedException();
+        var userTest = new UserData
+        {
+            Email = "furkyuaudbi@gmaail.com",
+            Password = "thisIsATestPw!1"
+        };
+        var test = await _emailSortClientRequests.LoginToEmailSortAsync(userTest);
+        Console.WriteLine(test);
     }
 }

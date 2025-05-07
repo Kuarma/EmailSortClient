@@ -1,55 +1,44 @@
 ﻿using EmailSortClient;
-using EmailSortClient.AuthenticateToServer;
-using EmailSortClient.ConsoleOperations;
-using EmailSortClient.Interfaces;
+using EmailSortClient.ValidationOperations;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
-using RestSharp;
+using Microsoft.Extensions.Options;
 using Serilog;
 using Serilog.Events;
 
-try
-{
-    var builder = Host.CreateDefaultBuilder(args);
+var builder = Host.CreateDefaultBuilder(args);
     
-    // Create Serilog logger
-     Log.Logger = new LoggerConfiguration()
-         .MinimumLevel.Verbose()
-         .WriteTo.Console(
-             restrictedToMinimumLevel: LogEventLevel.Debug
-             )
-         .WriteTo.File("logs.log", 
-             rollingInterval: RollingInterval.Hour, 
-             rollOnFileSizeLimit: true
-             )
-         .CreateLogger();
+// Create Serilog logger
+ Log.Logger = new LoggerConfiguration()
+     .MinimumLevel.Verbose()
+     .WriteTo.Console(
+         restrictedToMinimumLevel: LogEventLevel.Debug
+         )
+     .WriteTo.File("logs.log", 
+         rollingInterval: RollingInterval.Hour, 
+         rollOnFileSizeLimit: true
+         )
+     .CreateLogger();
 
-     builder.UseSerilog();
+ builder.UseSerilog();
 
-     builder.ConfigureServices((_, services) =>
+ builder.ConfigureServices((_, services) =>
+ {
+     services.AddHttpClient<IEmailServerHttpClient, EmailServerHttpClient>((sp, httpClient) =>
      {
-         services.AddSingleton<RestClient>(sp =>
-         {
-             var configuration = sp.GetRequiredService<IConfiguration>();
-             return new RestClient(configuration["RestClient:BaseUrl"]!);
-         });
-
-         services.AddSingleton<IEmailSortClientRequests, EmailSortServerApiRequests>();
-         services.AddSingleton<IConsoleRequests, ConsoleRequests>();
-         
-         services.AddHostedService<Worker>();
+         var configuration = sp.GetRequiredService<IConfiguration>();
+         httpClient.BaseAddress = configuration.GetValue<Uri>("RestClient:BaseUrl");
      });
+
+     //Later add validation-rules
+     services.AddOptions<UserData>().BindConfiguration("Credentials").Services.AddTransient<UserData>(sp =>
+         sp.GetRequiredService<IOptionsMonitor<UserData>>().CurrentValue
+         );
      
-     var app = builder.Build();
-     
-     await app.RunAsync();
-}
-catch (Exception ex)
-{
-    Log.Error(ex, "An unhandled exception has occurred.");
-}
-finally
-{
-    Log.CloseAndFlush();
-}
+     services.AddHostedService<Worker>();
+ });
+ 
+ var app = builder.Build();
+ 
+ await app.RunAsync();
